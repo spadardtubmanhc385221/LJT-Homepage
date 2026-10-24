@@ -86,6 +86,7 @@ jobs:
           tar -xf "$BUILT_DIR/artifact.tar" -C "$RUNNER_TEMP/site"
           git worktree add --orphan -B gh-pages "$PUBLISH_DIR"
           cp -a "$RUNNER_TEMP/site/." "$PUBLISH_DIR/"
+          touch "$PUBLISH_DIR/.nojekyll"
           git -C "$PUBLISH_DIR" add --all
           git -C "$PUBLISH_DIR" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Publish verified homepage from ${GITHUB_SHA}"
           git -C "$PUBLISH_DIR" push --force origin HEAD:refs/heads/gh-pages
