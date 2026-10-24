@@ -1,50 +1,73 @@
-# Workflow for building and deploying an Academic Pages / Jekyll site to GitHub Pages
 name: Deploy Academic Pages template site to Pages
 
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["master"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # Build job
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
-      - name: Setup Ruby, JRuby and TruffleRuby
+      - name: Setup Ruby
         uses: ruby/setup-ruby@v1.328.0
         with:
           ruby-version: '3.1'
           bundler-cache: true
           cache-version: 0
       - name: Configure GitHub Pages
+        id: pages
         uses: actions/configure-pages@v6.0.0
+        with:
+          enablement: true
       - name: Build with Jekyll
-        # Outputs to the './_site' directory by default
-        run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
+        run: bundle exec jekyll build --strict_front_matter --baseurl "${{ steps.pages.outputs.base_path }}"
         env:
           JEKYLL_ENV: production
+      - name: Verify profile and publication coverage
+        shell: python
+        run: |
+          from pathlib import Path
+          from html import escape
+
+          root = Path('_site')
+          about = (root / 'index.html').read_text(encoding='utf-8')
+          publications = (root / 'publications' / 'index.html').read_text(encoding='utf-8')
+          titles = [
+              'SynLogic: Synthesizing Verifiable Reasoning Data at Scale for Learning Logical Reasoning and Beyond',
+              'On the Perception Bottleneck of VLMs for Chart Understanding',
+              'On the Universal Truthfulness Hyperplane Inside LLMs',
+              'In-Context Sharpness as Alerts: An Inner Representation Perspective for Hallucination Mitigation',
+              'C-Eval: A Multi-Level Multi-Discipline Chinese Evaluation Suite for Foundation Models',
+              'Composing Parameter-Efficient Modules with Arithmetic Operations',
+          ]
+          for title in titles:
+              title = escape(title, quote=False)
+              assert about.count(title) == 1, f'Missing or duplicated About publication: {title}'
+              assert publications.count(title) == 1, f'Missing or duplicated publication: {title}'
+          assert publications.count('<article ') == 6
+          pages = sorted(str(path.relative_to(root)) for path in root.rglob('*.html'))
+          assert pages == ['index.html', 'publications/index.html'], pages
+          for text in (about, publications):
+              assert 'Junteng Liu' in text
+              assert 'jliugi@connect.ust.hk' in text
+              for placeholder in ('Your Name', 'Your Sidebar Name', 'Red Brick University', 'none@example.org', 'PS_CX0AAAAAJ', '/images/profile.png', '/images/og-image.png'):
+                  assert placeholder not in text, placeholder
+          print('Verified two content pages and all six publications on both pages.')
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v5.0.0
 
-  # Deployment job
   deploy:
     environment:
       name: github-pages

@@ -3,34 +3,23 @@ layout: archive
 title: "Publications"
 permalink: /publications/
 author_profile: true
+description: "Publications by Junteng Liu."
 ---
 
-{% if site.author.googlescholar %}
-  <div class="wordwrap">You can also find my articles on <a href="{{site.author.googlescholar}}">my Google Scholar profile</a>.</div>
-{% endif %}
-
 {% include base_path %}
-
-<!-- New style rendering if publication categories are defined -->
-{% if site.publication_category %}
-  {% for category in site.publication_category  %}
-    {% assign title_shown = false %}
-    {% for post in site.publications reversed %}
-      {% if post.category != category[0] %}
-        {% continue %}
-      {% endif %}
-      {% unless title_shown %}
-        <h2>{{ category[1].title }}</h2><hr />
-        {% assign title_shown = true %}
-      {% endunless %}
-      {% include archive-single.html %}
-    {% endfor %}
-  {% endfor %}
-{% else %}
-  {% for post in site.publications reversed %}
-    {% include archive-single.html %}
-  {% endfor %}
+<p>The following publications are also listed in the <a href="{{ base_path }}/">About section</a>.</p>
+{% if site.author.googlescholar %}
+<p><a href="{{ site.author.googlescholar }}">Google Scholar profile</a></p>
 {% endif %}
 
-
-
+<!-- Only source-provided publication years are displayed; no exact dates are inferred. -->
+{% for publication in site.publications %}
+<div class="list__item">
+  <article class="archive__item" itemscope itemtype="https://schema.org/ScholarlyArticle">
+    <h2 class="archive__item-title" itemprop="headline">{{ publication.title | escape }}</h2>
+    <div itemprop="author">{{ publication.authors | markdownify }}</div>
+    <p><em>{{ publication.venue | escape }}</em>, {{ publication.year }}.</p>
+    {% if publication.role %}<p>{{ publication.role | escape }}.</p>{% endif %}
+  </article>
+</div>
+{% endfor %}
