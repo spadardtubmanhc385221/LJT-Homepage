@@ -23,6 +23,10 @@ bundle install
 bundle exec jekyll serve
 ```
 
-The production URL and `/LJT-Homepage` base path are configured in `_config.yml`. The workflow builds and validates both pages, verifies that each contains all six publication titles, and publishes the generated static files to the `gh-pages` deployment branch. That branch is generated output; edit the source files on `master` instead. GitHub Pages serves the site from `gh-pages` at the repository root.
+## Deployment
+
+The workflow builds and validates both pages, verifies that each contains all six publication titles, and publishes the generated static files to the `gh-pages` deployment branch. That branch is generated output; edit the source files on `master` instead.
+
+GitHub Pages must also be enabled for the repository. Its automatic creation was blocked by the Actions integration's permissions during setup. In **Settings > Pages**, select **Deploy from a branch**, branch **gh-pages**, and **/(root)**, then save. The configured production URL is `https://spadardtubmanhc385221.github.io/LJT-Homepage/`. Until Pages is enabled, the workflow warns that live-site verification is skipped; a successful build does not mean the public URL is live. Once enabled, the workflow also checks both public URLs.
 
 The original theme license is retained in `LICENSE`.

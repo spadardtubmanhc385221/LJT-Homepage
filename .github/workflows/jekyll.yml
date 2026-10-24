@@ -89,7 +89,8 @@ jobs:
           git -C "$PUBLISH_DIR" add --all
           git -C "$PUBLISH_DIR" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Publish verified homepage from ${GITHUB_SHA}"
           git -C "$PUBLISH_DIR" push --force origin HEAD:refs/heads/gh-pages
-      - name: Wait for GitHub Pages to recognize the publishing branch
+      - name: Check whether GitHub Pages is enabled
+        id: pages_status
         env:
           GH_REPOSITORY: ${{ github.repository }}
           GH_PAGES_TOKEN: ${{ github.token }}
@@ -103,14 +104,20 @@ jobs:
               "https://api.github.com/repos/$GH_REPOSITORY/pages")
             if [ "$status" = '200' ]; then
               ruby -rjson -e 'page = JSON.parse(File.read(ARGV.fetch(0))); abort "Unexpected publishing branch" unless page.dig("source", "branch") == "gh-pages"; puts page.fetch("html_url")' "$response_file"
+              echo 'enabled=true' >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "Waiting for GitHub Pages to recognize gh-pages ($attempt/12)."
+            if [ "$status" != '404' ]; then
+              echo "Unexpected GitHub Pages API status: $status"
+              exit 1
+            fi
+            echo "Waiting for GitHub Pages activation ($attempt/12)."
             sleep 5
           done
-          echo '::warning::GitHub Pages has not yet exposed the generated gh-pages branch.'
-          exit 1
+          echo 'enabled=false' >> "$GITHUB_OUTPUT"
+          echo '::warning title=GitHub Pages activation required::The verified static site is on gh-pages, but live verification is skipped because GitHub Pages is not enabled. In repository Settings > Pages, select Deploy from a branch, gh-pages, and /(root), then save.'
       - name: Verify the published homepage
+        if: steps.pages_status.outputs.enabled == 'true'
         env:
           SITE_URL: https://spadardtubmanhc385221.github.io/LJT-Homepage/
         run: |
