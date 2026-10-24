@@ -1,4 +1,4 @@
-name: Deploy Academic Pages template site to Pages
+name: Build and publish LJT-Homepage
 
 on:
   push:
@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: "pages"
@@ -26,13 +24,8 @@ jobs:
           ruby-version: '3.1'
           bundler-cache: true
           cache-version: 0
-      - name: Configure GitHub Pages
-        id: pages
-        uses: actions/configure-pages@v6.0.0
-        with:
-          enablement: true
       - name: Build with Jekyll
-        run: bundle exec jekyll build --strict_front_matter --baseurl "${{ steps.pages.outputs.base_path }}"
+        run: bundle exec jekyll build --strict_front_matter
         env:
           JEKYLL_ENV: production
       - name: Verify profile and publication coverage
@@ -65,16 +58,66 @@ jobs:
               for placeholder in ('Your Name', 'Your Sidebar Name', 'Red Brick University', 'none@example.org', 'PS_CX0AAAAAJ', '/images/profile.png', '/images/og-image.png'):
                   assert placeholder not in text, placeholder
           print('Verified two content pages and all six publications on both pages.')
-      - name: Upload GitHub Pages artifact
+          (root / '.nojekyll').touch()
+      - name: Upload verified static site
         uses: actions/upload-pages-artifact@v5.0.0
 
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  publish:
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      contents: write
+      pages: read
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+      - name: Download verified static site
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/built-site
+      - name: Publish static files to the deployment branch
+        env:
+          PUBLISH_DIR: ${{ runner.temp }}/site-publish
+          BUILT_DIR: ${{ runner.temp }}/built-site
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/site"
+          tar -xf "$BUILT_DIR/artifact.tar" -C "$RUNNER_TEMP/site"
+          git worktree add --orphan -B gh-pages "$PUBLISH_DIR"
+          cp -a "$RUNNER_TEMP/site/." "$PUBLISH_DIR/"
+          git -C "$PUBLISH_DIR" add --all
+          git -C "$PUBLISH_DIR" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Publish verified homepage from ${GITHUB_SHA}"
+          git -C "$PUBLISH_DIR" push --force origin HEAD:refs/heads/gh-pages
+      - name: Wait for GitHub Pages to recognize the publishing branch
+        env:
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_PAGES_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          response_file="$RUNNER_TEMP/pages-status.json"
+          for attempt in $(seq 1 12); do
+            status=$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+              -H "Authorization: Bearer $GH_PAGES_TOKEN" \
+              -H 'Accept: application/vnd.github+json' \
+              "https://api.github.com/repos/$GH_REPOSITORY/pages")
+            if [ "$status" = '200' ]; then
+              ruby -rjson -e 'page = JSON.parse(File.read(ARGV.fetch(0))); abort "Unexpected publishing branch" unless page.dig("source", "branch") == "gh-pages"; puts page.fetch("html_url")' "$response_file"
+              exit 0
+            fi
+            echo "Waiting for GitHub Pages to recognize gh-pages ($attempt/12)."
+            sleep 5
+          done
+          echo '::warning::GitHub Pages has not yet exposed the generated gh-pages branch.'
+          exit 1
+      - name: Verify the published homepage
+        env:
+          SITE_URL: https://spadardtubmanhc385221.github.io/LJT-Homepage/
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 12 --retry-delay 5 --retry-all-errors "$SITE_URL" > "$RUNNER_TEMP/published-homepage.html"
+          grep -q 'Junteng Liu' "$RUNNER_TEMP/published-homepage.html"
+          grep -q 'SynLogic: Synthesizing Verifiable Reasoning Data at Scale for Learning Logical Reasoning and Beyond' "$RUNNER_TEMP/published-homepage.html"
+          curl --fail --silent --show-error --location --retry 6 --retry-delay 5 --retry-all-errors "${SITE_URL}publications/" > "$RUNNER_TEMP/published-publications.html"
+          grep -q 'Composing Parameter-Efficient Modules with Arithmetic Operations' "$RUNNER_TEMP/published-publications.html"
+          printf 'Published and verified: %s\n' "$SITE_URL"

@@ -23,6 +23,6 @@ bundle install
 bundle exec jekyll serve
 ```
 
-The production URL and `/LJT-Homepage` base path are configured in `_config.yml`. The deployment workflow builds the site and verifies that both pages contain all six publication titles.
+The production URL and `/LJT-Homepage` base path are configured in `_config.yml`. The workflow builds and validates both pages, verifies that each contains all six publication titles, and publishes the generated static files to the `gh-pages` deployment branch. That branch is generated output; edit the source files on `master` instead. GitHub Pages serves the site from `gh-pages` at the repository root.
 
 The original theme license is retained in `LICENSE`.
